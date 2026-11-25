@@ -26,46 +26,161 @@ OUTPUT_FORMATS = ["PDF", "DOCX", "DOC", "ODT", "TXT", "HTML", "RTF", "XLSX", "OD
 class ConverterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("文档转换器")
-        self.root.geometry("920x620")
-        self.root.minsize(780, 520)
+        self.root.title("DocConverter - 文档转换工作台")
+        self.root.geometry("1080x720")
+        self.root.minsize(900, 620)
 
         self.files = []
         self.output_dir = tk.StringVar()
+        self.status = tk.StringVar(value="就绪")
+        self.output_format = tk.StringVar(value="PDF")
+        self.count_text = tk.StringVar(value="0 个文件")
 
+        self.configure_theme()
         self._build_ui()
 
+    def configure_theme(self):
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure(".", background="#F5F6F8", foreground="#202124",
+                        font=("Microsoft YaHei UI", 10))
+        style.configure("TFrame", background="#F5F6F8")
+        style.configure("Canvas.TFrame", background="#FFFFFF")
+        style.configure("Main.TFrame", background="#F5F6F8")
+        style.configure("Header.TFrame", background="#FFFFFF")
+        style.configure("TLabel", background="#FFFFFF", foreground="#5F6368")
+        style.configure("Title.TLabel", background="#FFFFFF", foreground="#202124",
+                        font=("Microsoft YaHei UI", 18, "bold"))
+        style.configure("Muted.TLabel", background="#FFFFFF", foreground="#8A9099",
+                        font=("Microsoft YaHei UI", 9))
+        style.configure("Section.TLabel", background="#FFFFFF", foreground="#202124",
+                        font=("Microsoft YaHei UI", 11, "bold"))
+        style.configure("Status.TLabel", background="#FFFFFF", foreground="#8A9099",
+                        font=("Microsoft YaHei UI", 9))
+        style.configure("TButton", padding=(12, 8), relief="flat")
+        style.map("TButton", background=[("active", "#EEF1F4")])
+        style.configure("Primary.TButton", background="#202124", foreground="#FFFFFF",
+                        font=("Microsoft YaHei UI", 10, "bold"), padding=(17, 10), relief="flat")
+        style.map("Primary.TButton", background=[("active", "#34373A")])
+        style.configure("Secondary.TButton", background="#FFFFFF", foreground="#202124",
+                        borderwidth=1, relief="solid", padding=(12, 8))
+        style.map("Secondary.TButton", background=[("active", "#F2F4F5")])
+        style.configure("TCombobox", fieldbackground="#FFFFFF", background="#FFFFFF",
+                        foreground="#202124", padding=8)
+        style.configure("Horizontal.TProgressbar", background="#202124",
+                        troughcolor="#ECEFF1", thickness=6)
+
     def _build_ui(self):
-        top = ttk.Frame(self.root, padding=12)
-        top.pack(fill="x")
-        ttk.Button(top, text="添加文件", command=self.add_files).pack(side="left")
-        ttk.Button(top, text="清空列表", command=self.clear_files).pack(side="left", padx=(8, 0))
+        self.root.configure(background="#F5F6F8")
 
-        self.file_list = tk.Listbox(self.root, height=12)
-        self.file_list.pack(fill="both", expand=True, padx=12)
+        shell = tk.Frame(self.root, bg="#FFFFFF", highlightbackground="#DDE1E5",
+                         highlightthickness=1)
+        shell.pack(fill="both", expand=True, padx=18, pady=18)
 
-        controls = ttk.LabelFrame(self.root, text="转换设置", padding=12)
-        controls.pack(fill="x", padx=12, pady=(10, 0))
+        header = tk.Frame(shell, bg="#FFFFFF", height=78)
+        header.pack(fill="x", padx=24)
+        header.pack_propagate(False)
 
-        ttk.Label(controls, text="目标格式").grid(row=0, column=0, sticky="w")
-        self.output_format = tk.StringVar(value="PDF")
-        self.format_combo = ttk.Combobox(controls, textvariable=self.output_format,
-                                         values=OUTPUT_FORMATS, state="readonly", width=12)
-        self.format_combo.grid(row=0, column=1, padx=(8, 20))
+        title_block = tk.Frame(header, bg="#FFFFFF")
+        title_block.pack(side="left", fill="y")
+        tk.Label(title_block, text="DocConverter", bg="#FFFFFF", fg="#202124",
+                 font=("Microsoft YaHei UI", 17, "bold")).pack(anchor="w", pady=(16, 0))
+        tk.Label(title_block, text="文档转换工作台", bg="#FFFFFF", fg="#8A9099",
+                 font=("Microsoft YaHei UI", 9)).pack(anchor="w", pady=(2, 0))
 
-        ttk.Label(controls, text="输出目录").grid(row=0, column=2, sticky="w")
-        ttk.Entry(controls, textvariable=self.output_dir).grid(row=0, column=3, sticky="ew", padx=(8, 8))
-        ttk.Button(controls, text="选择", command=self.choose_output).grid(row=0, column=4)
-        controls.columnconfigure(3, weight=1)
+        header_actions = tk.Frame(header, bg="#FFFFFF")
+        header_actions.pack(side="right", fill="y")
+        ttk.Button(header_actions, text="清空", style="Secondary.TButton",
+                   command=self.clear_files).pack(side="left", pady=22)
+        ttk.Button(header_actions, text="移除选中", style="Secondary.TButton",
+                   command=self.remove_selected).pack(side="left", padx=(8, 0), pady=22)
 
-        bottom = ttk.Frame(self.root, padding=12)
-        bottom.pack(fill="x")
-        self.progress = ttk.Progressbar(bottom, mode="determeterminate")
-        self.progress.pack(side="left", fill="x", expand=True)
-        ttk.Button(bottom, text="开始转换", command=self.start_conversion).pack(side="right", padx=(12, 0))
+        divider = tk.Frame(shell, bg="#ECEFF1", height=1)
+        divider.pack(fill="x")
 
-        self.status = tk.StringVar(value="就绪")
-        ttk.Label(self.root, textvariable=self.status, anchor="w").pack(fill="x", padx=12, pady=(0, 8))
+        body = tk.Frame(shell, bg="#FFFFFF")
+        body.pack(fill="both", expand=True, padx=24, pady=20)
+
+        files_section = tk.Frame(body, bg="#FFFFFF")
+        files_section.pack(side="left", fill="both", expand=True)
+
+        files_head = tk.Frame(files_section, bg="#FFFFFF", height=44)
+        files_head.pack(fill="x")
+        files_head.pack_propagate(False)
+        tk.Label(files_head, text="待转换文件", bg="#FFFFFF", fg="#202124",
+                 font=("Microsoft YaHei UI", 12, "bold")).pack(side="left")
+        tk.Label(files_head, textvariable=self.count_text, bg="#FFFFFF", fg="#8A9099",
+                 font=("Microsoft YaHei UI", 9)).pack(side="right")
+
+        list_frame = tk.Frame(files_section, bg="#F8F9FA", highlightbackground="#DDE1E5",
+                              highlightthickness=1)
+        list_frame.pack(fill="both", expand=True)
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+        self.file_list = tk.Listbox(
+            list_frame,
+            height=12,
+            borderwidth=0,
+            highlightthickness=0,
+            selectbackground="#E7EBEF",
+            selectforeground="#202124",
+            background="#F8F9FA",
+            foreground="#3C4043",
+            activestyle="none",
+            font=("Microsoft YaHei UI", 10),
+            yscrollcommand=scrollbar.set,
+        )
+        self.file_list.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=8)
+        scrollbar.config(command=self.file_list.yview)
+
+        add_row = tk.Frame(files_section, bg="#FFFFFF", height=54)
+        add_row.pack(fill="x")
+        add_row.pack_propagate(False)
+        ttk.Button(add_row, text="＋  添加文件", style="Secondary.TButton",
+                   command=self.add_files).pack(side="left", pady=10)
+        tk.Label(add_row, text="支持 PDF、图片及 Office 文档",
+                 bg="#FFFFFF", fg="#A0A5AC",
+                 font=("Microsoft YaHei UI", 9)).pack(side="right", pady=10)
+
+        settings = tk.Frame(body, bg="#FFFFFF", width=268)
+        settings.pack(side="right", fill="y", padx=(24, 0))
+        settings.pack_propagate(False)
+
+        tk.Label(settings, text="转换设置", bg="#FFFFFF", fg="#202124",
+                 font=("Microsoft YaHei UI", 12, "bold")).pack(anchor="w", pady=(0, 18))
+
+        tk.Label(settings, text="目标格式", bg="#FFFFFF", fg="#5F6368",
+                 font=("Microsoft YaHei UI", 9)).pack(anchor="w")
+        self.format_combo = ttk.Combobox(settings, textvariable=self.output_format,
+                                         values=OUTPUT_FORMATS, state="readonly", width=24)
+        self.format_combo.pack(anchor="w", fill="x", pady=(7, 20), ipady=5)
+
+        tk.Label(settings, text="输出目录", bg="#FFFFFF", fg="#5F6368",
+                 font=("Microsoft YaHei UI", 9)).pack(anchor="w")
+        self.output_entry = tk.Entry(settings, textvariable=self.output_dir, relief="solid",
+                                     borderwidth=1, bg="#FFFFFF", fg="#3C4043",
+                                     font=("Microsoft YaHei UI", 9), highlightthickness=0)
+        self.output_entry.pack(anchor="w", fill="x", pady=(7, 8), ipady=7)
+        ttk.Button(settings, text="选择输出目录", style="Secondary.TButton",
+                   command=self.choose_output).pack(anchor="w", fill="x")
+
+        convert_button = tk.Frame(settings, bg="#FFFFFF")
+        convert_button.pack(side="bottom", fill="x")
+        ttk.Button(convert_button, text="开始转换", style="Primary.TButton",
+                   command=self.start_conversion).pack(fill="x", ipady=4)
+
+        footer = tk.Frame(shell, bg="#FFFFFF", height=52)
+        footer.pack(fill="x", padx=24)
+        footer.pack_propagate(False)
+        tk.Frame(footer, bg="#ECEFF1", height=1).pack(fill="x", side="top")
+        self.progress = ttk.Progressbar(footer, mode="determinate")
+        self.progress.pack(side="left", fill="x", expand=True, pady=(16, 14))
+        ttk.Label(footer, textvariable=self.status, style="Status.TLabel",
+                  width=36, anchor="e").pack(side="right", padx=(16, 0), pady=(14, 12))
 
     def add_files(self):
         selected = filedialog.askopenfilenames(
@@ -85,8 +200,28 @@ class ConverterApp:
     def refresh_list(self):
         self.file_list.delete(0, tk.END)
         for path in self.files:
-            self.file_list.insert(tk.END, path)
+            name = Path(path).name
+            suffix = Path(path).suffix.upper().lstrip(".") or "文件"
+            size = 0
+            try:
+                size = Path(path).stat().st_size
+            except OSError:
+                pass
+            if size < 1024:
+                size_text = f"{size} B"
+            elif size < 1024 * 1024:
+                size_text = f"{size / 1024:.1f} KB"
+            else:
+                size_text = f"{size / 1024 / 1024:.1f} MB"
+            self.file_list.insert(tk.END, f"  {suffix:<5}  {name:<55}  {size_text}")
+        self.count_text.set(f"{len(self.files)} 个文件")
         self.status.set(f"已选择 {len(self.files)} 个文件")
+
+    def remove_selected(self):
+        selected = list(self.file_list.curselection())
+        for index in reversed(selected):
+            del self.files[index]
+        self.refresh_list()
 
     def choose_output(self):
         directory = filedialog.askdirectory(title="选择输出目录")
